@@ -75,15 +75,15 @@ def load_model_components():
     """
     try:
         # Load the dataframe
-        with open('dataframe', 'rb') as f:
+        with open('Pkled files/dataframe', 'rb') as f:
             df = pickle.load(f)
         
         # Load the TF-IDF matrix
-        with open('tfidf_matrix', 'rb') as f:
+        with open('Pkled files/tfidf_matrix', 'rb') as f:
             tfidf_matrix = pickle.load(f)
         
         # Load the indices
-        with open('indices', 'rb') as f:
+        with open('Pkled files/indices', 'rb') as f:
             indices = pickle.load(f)
         
         # Create and fit the NearestNeighbors model
