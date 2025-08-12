@@ -133,6 +133,7 @@ Movie Recommendation Model/
 
 ## 🙏 Acknowledgments
 
+- Kaggle (For the dataset used in the recommendation)
 - TMDB (for optional poster API)
 - Scikit-learn
 - FastAPI
