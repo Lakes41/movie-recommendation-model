@@ -1,13 +1,11 @@
 import streamlit as st
 import pickle
-import requests
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import difflib
 import os
 from typing import List, Tuple, Optional
-import json
 
 # Page configuration
 st.set_page_config(
@@ -75,15 +73,15 @@ def load_model_components():
     """
     try:
         # Load the dataframe
-        with open('Pkled files/dataframe', 'rb') as f:
+        with open('Pkled files/dataframe.pkl', 'rb') as f:
             df = pickle.load(f)
         
         # Load the TF-IDF matrix
-        with open('Pkled files/tfidf_matrix', 'rb') as f:
+        with open('Pkled files/tfidf_matrix.pkl', 'rb') as f:
             tfidf_matrix = pickle.load(f)
         
         # Load the indices
-        with open('Pkled files/indices', 'rb') as f:
+        with open('Pkled files/indices.pkl', 'rb') as f:
             indices = pickle.load(f)
         
         # Create and fit the NearestNeighbors model
@@ -101,37 +99,7 @@ def load_model_components():
         st.error(f"Error loading model components: {str(e)}")
         return None, None, None, None
 
-def get_movie_poster(movie_title: str, api_key: str = None) -> Optional[str]:
-    """
-    Get movie poster URL from TMDB API.
-    """
-    if not api_key:
-        return None
-    
-    try:
-        # Search for the movie
-        search_url = f"https://api.themoviedb.org/3/search/movie"
-        params = {
-            'api_key': api_key,
-            'query': movie_title,
-            'language': 'en-US',
-            'page': 1
-        }
-        
-        response = requests.get(search_url, params=params)
-        response.raise_for_status()
-        
-        data = response.json()
-        if data['results']:
-            poster_path = data['results'][0]['poster_path']
-            if poster_path:
-                return f"https://image.tmdb.org/t/p/w500{poster_path}"
-        
-        return None
-    
-    except Exception as e:
-        st.warning(f"Could not fetch poster for {movie_title}: {str(e)}")
-        return None
+
 
 def get_recommendations(
     movie_title: str,
@@ -139,7 +107,7 @@ def get_recommendations(
     tfidf_matrix,
     indices: pd.Series,
     nn_model: NearestNeighbors,
-    min_similarity: float = 0.6
+    min_similarity: float = 0.8
 ) -> Tuple[List[str], Optional[str]]:
     """
     Get movie recommendations based on input title.
@@ -199,9 +167,9 @@ def get_recommendations(
         st.error(f"Error getting recommendations: {str(e)}")
         return [], None
 
-def display_movie_card(movie_title: str, df: pd.DataFrame, poster_url: str = None):
+def display_movie_card(movie_title: str, df: pd.DataFrame):
     """
-    Display a movie card with title, genres, overview, and poster.
+    Display a movie card with title, year, genres, overview, and poster.
     """
     # Get movie details from dataframe
     movie_data = df[df['title'] == movie_title]
@@ -216,17 +184,41 @@ def display_movie_card(movie_title: str, df: pd.DataFrame, poster_url: str = Non
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        if poster_url:
-            st.image(poster_url, width=150)
+        # Get poster path from dataframe
+        poster_path = movie_info.get('poster_path', None)
+        if poster_path and pd.notna(poster_path):
+            try:
+                # Construct full poster URL
+                base_url = "https://image.tmdb.org/t/p/"
+                image_size = "w500"  # You can adjust this size as needed
+                full_poster_url = base_url + image_size + poster_path
+                
+                # Display poster image
+                st.image(full_poster_url, width=150, caption=movie_title)
+            except Exception as e:
+                st.write("🎬")  # Fallback for missing poster
         else:
             st.write("🎬")  # Placeholder for missing poster
     
     with col2:
+        # Get year from dataframe using the correct column name
+        year = movie_info.get('release_year', None)
+        
+        year_display = f" ({year})" if year else ""
+        
+        # Get overview text
+        overview = movie_info.get('overview', 'No overview available.')
+        
+        if overview and pd.notna(overview) and overview != 'No overview available.':
+            overview_display = overview[:300] + "..." if len(overview) > 300 else overview
+        else:
+            overview_display = "No overview available."
+        
         st.markdown(f"""
         <div class="movie-card">
-            <div class="movie-title">{movie_title}</div>
+            <div class="movie-title">{movie_title}{year_display}</div>
             <div class="movie-genres">{movie_info.get('genres', 'N/A')}</div>
-            <div class="movie-overview">{movie_info.get('overview', 'No overview available.')[:200]}...</div>
+            <div class="movie-overview">{overview_display}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -249,19 +241,12 @@ def main():
     # Sidebar for configuration
     st.sidebar.title("⚙️ Configuration")
     
-    # TMDB API key input
-    api_key = st.sidebar.text_input(
-        "TMDB API Key (optional)",
-        type="password",
-        help="Enter your TMDB API key to display movie posters. Get one at https://www.themoviedb.org/settings/api"
-    )
-    
     # Similarity threshold
     similarity_threshold = st.sidebar.slider(
         "Similarity Threshold",
         min_value=0.1,
         max_value=1.0,
-        value=0.6,
+        value=0.8,
         step=0.1,
         help="Minimum similarity for auto-correcting movie titles"
     )
@@ -307,13 +292,8 @@ def main():
             
             # Display recommendations
             for i, movie in enumerate(recommended_movies, 1):
-                # Get poster URL if API key is provided
-                poster_url = None
-                if api_key:
-                    poster_url = get_movie_poster(movie, api_key)
-                
-                # Display movie card
-                display_movie_card(movie, df, poster_url)
+                # Display movie card with poster and year from dataframe
+                display_movie_card(movie, df)
                 
                 if i < len(recommended_movies):
                     st.markdown("---")
@@ -329,7 +309,6 @@ def main():
     - **Genres**: Action, Drama, Comedy, etc.
     - **Keywords**: Plot-related terms and themes
     - **Overview**: Movie descriptions and synopses
-    - **Cast & Crew**: Actors and directors
     
     The recommendations are based on **TF-IDF vectorization** and **cosine similarity** using a Nearest Neighbors algorithm.
     """)
