@@ -222,6 +222,35 @@ def display_movie_card(movie_title: str, df: pd.DataFrame):
         </div>
         """, unsafe_allow_html=True)
 
+def filter_movies_by_title(df: pd.DataFrame, search_term: str, max_results: int = 20) -> List[str]:
+    """
+    Filter movies by title search term for auto-complete dropdown.
+    
+    Args:
+        df: Movie dataframe
+        search_term: User input to search for
+        max_results: Maximum number of results to return
+    
+    Returns:
+        List of matching movie titles
+    """
+    if not search_term or len(search_term.strip()) < 2:
+        return []
+    
+    search_term = search_term.lower().strip()
+    
+    # Filter movies that contain the search term
+    mask = df['title'].str.lower().str.contains(search_term, na=False)
+    filtered_movies = df[mask]['title'].tolist()
+    
+    # Sort by relevance (exact matches first, then partial matches)
+    exact_matches = [title for title in filtered_movies if title.lower().startswith(search_term)]
+    partial_matches = [title for title in filtered_movies if title not in exact_matches]
+    
+    # Combine and limit results
+    sorted_results = exact_matches + partial_matches
+    return sorted_results[:max_results]
+
 def main():
     """
     Main Streamlit application.
@@ -257,6 +286,33 @@ def main():
     # Movie search section
     st.subheader("🔍 Find Movie Recommendations")
     
+    # Auto-complete dropdown
+    search_term = st.text_input(
+        "Search for a movie:",
+        placeholder="Start typing to search movies...",
+        help="Type to see movie suggestions",
+        key="search_input"
+    )
+    
+    # Show filtered results in dropdown
+    if search_term and len(search_term.strip()) >= 2:
+        filtered_movies = filter_movies_by_title(df, search_term)
+        
+        if filtered_movies:
+            st.write("**Select a movie from the suggestions below:**")
+            
+            # Create columns for better layout
+            cols = st.columns(3)
+            for i, movie in enumerate(filtered_movies):
+                with cols[i % 3]:
+                    if st.button(movie, key=f"dropdown_{i}"):
+                        # Update the search input with selected movie
+                        st.session_state.movie_input = movie
+                        st.rerun()
+    
+    st.markdown("---")
+    st.subheader("**Or enter movie title manually:**")
+    
     # Create two columns for input
     col1, col2 = st.columns([3, 1])
     
@@ -264,7 +320,8 @@ def main():
         movie_input = st.text_input(
             "Enter a movie title:",
             placeholder="e.g., The Godfather, Inception, Pulp Fiction...",
-            help="Type the name of a movie you like to get similar recommendations"
+            help="Type the name of a movie you like to get similar recommendations",
+            key="movie_input"
         )
     
     with col2:
