@@ -65,7 +65,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
 @st.cache_resource
 def load_model_components():
     """
@@ -120,23 +119,10 @@ def get_recommendations(
         key = movie_title.lower().strip()
         corrected_title = None
         
-        # Check if the title exists in our index
+        # Require exact match in indices (no auto-correction here)
         if key not in indices.index:
-            # Try to auto-correct using difflib
-            close_matches = difflib.get_close_matches(key, indices.index, n=1, cutoff=min_similarity)
-            
-            if close_matches:
-                corrected_key = close_matches[0]
-                corrected_movie_id = indices[[corrected_key]].iloc[0]
-                
-                # Get the corrected movie title
-                corrected_title = df[df['id'] == corrected_movie_id]['title'].iloc[0]
-                st.info(f"Title '{movie_title}' not found. Using closest match: '{corrected_title}'")
-                
-                key = corrected_key
-            else:
-                st.error(f"Movie title '{movie_title}' not found and no close match available.")
-                return [], None
+            st.error(f"Movie title '{movie_title}' not found.")
+            return [], None
         
         # Get the movie ID for the title
         movie_id = indices[[key]].iloc[0]
@@ -277,7 +263,7 @@ def main():
         max_value=1.0,
         value=0.8,
         step=0.1,
-        help="Minimum similarity for auto-correcting movie titles"
+        help="Minimum similarity for corrected-title suggestions (higher = stricter)"
     )
     
     # Main content area
@@ -285,75 +271,104 @@ def main():
     
     # Movie search section
     st.subheader("🔍 Find Movie Recommendations")
+
+    # Session state for correction workflow
+    if 'correction_mode' not in st.session_state:
+        st.session_state['correction_mode'] = False
+    if 'suggestions' not in st.session_state:
+        st.session_state['suggestions'] = []
+    if 'selected_correction' not in st.session_state:
+        st.session_state['selected_correction'] = None
     
-    # Auto-complete dropdown
-    search_term = st.text_input(
-        "Search for a movie:",
-        placeholder="Start typing to search movies...",
-        help="Type to see movie suggestions",
-        key="search_input"
-    )
-    
-    # Show filtered results in dropdown
-    if search_term and len(search_term.strip()) >= 2:
-        filtered_movies = filter_movies_by_title(df, search_term)
-        
-        if filtered_movies:
-            st.write("**Select a movie from the suggestions below:**")
-            
-            # Create columns for better layout
-            cols = st.columns(3)
-            for i, movie in enumerate(filtered_movies):
-                with cols[i % 3]:
-                    if st.button(movie, key=f"dropdown_{i}"):
-                        # Update the search input with selected movie
-                        st.session_state.movie_input = movie
-                        st.rerun()
-    
-    st.markdown("---")
-    st.subheader("**Or enter movie title manually:**")
-    
-    # Create two columns for input
+    # Single input box + button
     col1, col2 = st.columns([3, 1])
     
+    # Buffer for controlled text_input value to avoid post-instantiation mutation
+    if 'pending_movie_input' not in st.session_state:
+        st.session_state['pending_movie_input'] = ""
+
     with col1:
         movie_input = st.text_input(
             "Enter a movie title:",
+            value=st.session_state.get('pending_movie_input', ""),
             placeholder="e.g., The Godfather, Inception, Pulp Fiction...",
             help="Type the name of a movie you like to get similar recommendations",
             key="movie_input"
         )
     
     with col2:
-        search_button = st.button("🎯 Get Recommendations", use_container_width=True)
-    
-    # Display recommendations
+        search_button = st.button("🎯 Get Recommendations", use_container_width=True, key="get_recs_button")
+
+    recommended_movies: List[str] = []
+    corrected_title: Optional[str] = None
+    based_on_title_var: Optional[str] = None
+
+    # Handle search
     if search_button and movie_input.strip():
-        with st.spinner("Finding similar movies..."):
-            recommended_movies, corrected_title = get_recommendations(
-                movie_input,
-                df,
-                tfidf_matrix,
-                indices,
-                nn_model,
-                similarity_threshold
-            )
-        
-        if recommended_movies:
-            st.markdown("---")
-            st.subheader("🎬 Recommended Movies")
-            
-            # Display the search movie first (if corrected)
-            if corrected_title:
-                st.markdown(f"**Based on:** {corrected_title}")
-            
-            # Display recommendations
-            for i, movie in enumerate(recommended_movies, 1):
-                # Display movie card with poster and year from dataframe
-                display_movie_card(movie, df)
-                
-                if i < len(recommended_movies):
-                    st.markdown("---")
+        user_key = movie_input.lower().strip()
+        if user_key in indices.index:
+            with st.spinner("Finding similar movies..."):
+                recommended_movies, corrected_title = get_recommendations(
+                    movie_input,
+                    df,
+                    tfidf_matrix,
+                    indices,
+                    nn_model,
+                    similarity_threshold
+                )
+            st.session_state['correction_mode'] = False
+            st.session_state['suggestions'] = []
+        else:
+            # Build suggestions: first substring matches, then difflib fallback
+            suggestions = filter_movies_by_title(df, movie_input, max_results=20)
+            if not suggestions:
+                close_keys = difflib.get_close_matches(user_key, indices.index, n=10, cutoff=similarity_threshold)
+                suggestions = []
+                for ck in close_keys:
+                    try:
+                        corrected_movie_id = indices[[ck]].iloc[0]
+                        title_candidate = df[df['id'] == corrected_movie_id]['title'].iloc[0]
+                        suggestions.append(title_candidate)
+                    except Exception:
+                        pass
+            if suggestions:
+                st.session_state['correction_mode'] = True
+                st.session_state['suggestions'] = suggestions
+                st.info("Title not found. Please select a corrected title below.")
+            else:
+                st.error(f"Movie title '{movie_input}' not found and no close match available.")
+
+    # Show correction dropdown if needed
+    if st.session_state['correction_mode'] and st.session_state['suggestions']:
+        selected = st.selectbox("Did you mean:", st.session_state['suggestions'], key="selected_correction")
+        confirm = st.button("Use selected title")
+        if confirm and selected:
+            with st.spinner("Finding similar movies..."):
+                recommended_movies, corrected_title = get_recommendations(
+                    selected,
+                    df,
+                    tfidf_matrix,
+                    indices,
+                    nn_model,
+                    similarity_threshold
+                )
+            # Update state and input field to the selected value
+            # Update buffer instead of the widget key after instantiation
+            st.session_state['pending_movie_input'] = selected
+            st.session_state['correction_mode'] = False
+            st.session_state['suggestions'] = []
+            based_on_title_var = selected
+
+    # Display recommendations if available from this interaction
+    if recommended_movies:
+        st.markdown("---")
+        st.subheader("🎬 Recommended Movies")
+        based_on_title = based_on_title_var or st.session_state.get('pending_movie_input', movie_input)
+        st.markdown(f"**Based on:** {based_on_title}")
+        for i, movie in enumerate(recommended_movies, 1):
+            display_movie_card(movie, df)
+            if i < len(recommended_movies):
+                st.markdown("---")
     
     # Information section
     st.markdown("---")
@@ -375,15 +390,14 @@ def main():
     st.subheader("🎯 Try These Popular Movies")
     
     sample_movies = [
-        "The Godfather", "Inception", "Pulp Fiction", "The Shawshank Redemption",
-        "Fight Club", "The Matrix", "Forrest Gump", "Goodfellas"
+        "The Godfather", "The Matrix", "The Avengers", "Love & other drugs", "Goodfellas", "Se7en"
     ]
     
     cols = st.columns(4)
     for i, movie in enumerate(sample_movies):
         with cols[i % 4]:
             if st.button(movie, key=f"sample_{i}"):
-                st.session_state.movie_input = movie
+                st.session_state['pending_movie_input'] = movie
                 st.rerun()
 
 if __name__ == "__main__":
