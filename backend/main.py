@@ -3,13 +3,20 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from recommendation import load_model_components, get_recommendations
+import os
 
 app = FastAPI()
 
-# CORS (allow requests from frontend during dev)
+# CORS configuration for production
+origins = [
+    "http://localhost:5173",  # Local development
+    "https://1cinematch.vercel.app/",  # Replace with your Vercel URL
+    "https://*.vercel.app",  # Allow all Vercel subdomains
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Replace with specific frontend URL in production
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
