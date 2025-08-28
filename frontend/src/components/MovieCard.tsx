@@ -1,8 +1,7 @@
-import React from 'react'
 import { motion } from 'framer-motion'
 import { Star, Calendar, Film } from 'lucide-react'
 import { Card, CardContent } from './ui/Card'
-import { cn, getImageUrl, truncateText, formatYear } from '../lib/utils'
+import { getImageUrl, truncateText, } from '../lib/utils'
 
 interface Movie {
   title: string

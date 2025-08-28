@@ -5,7 +5,6 @@ import axios from 'axios'
 import { LoaderScreen } from './components/LoaderScreen'
 import { SearchSection } from './components/SearchSection'
 import { MovieCard } from './components/MovieCard'
-import { Button } from './components/ui/Button'
 import { Card, CardContent } from './components/ui/Card'
 import { cn } from './lib/utils'
 import './App.css'
@@ -57,7 +56,8 @@ function App() {
     setCorrected('')
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/recommend', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+      const response = await axios.post(`${apiUrl}/recommend`, {
         title: movie,
         similarity_threshold: threshold
       })
