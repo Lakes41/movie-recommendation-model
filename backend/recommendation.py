@@ -6,13 +6,13 @@ import difflib
 from typing import List, Optional, Tuple
 
 def load_model_components():
-    with open('Pkled Files/dataframe', 'rb') as f:
+    with open('Pkled Files/dataframe.pkl', 'rb') as f:
         df = pickle.load(f)
 
-    with open('Pkled Files/tfidf_matrix', 'rb') as f:
+    with open('Pkled Files/tfidf_matrix.pkl', 'rb') as f:
         tfidf_matrix = pickle.load(f)
 
-    with open('Pkled Files/indices', 'rb') as f:
+    with open('Pkled Files/indices.pkl', 'rb') as f:
         indices = pickle.load(f)
 
     nn_model = NearestNeighbors(
@@ -32,7 +32,7 @@ def get_recommendations(
     indices: pd.Series,
     nn_model: NearestNeighbors,
     min_similarity: float = 0.6
-) -> Tuple[List[str], Optional[str]]:
+) -> Tuple[List[dict], Optional[str]]:
     key = movie_title.lower().strip()
     corrected_title = None
 
@@ -54,6 +54,19 @@ def get_recommendations(
     movie_vector = tfidf_matrix[row_idx]
     distances, neighbor_indices = nn_model.kneighbors(movie_vector, return_distance=True)
     recommended_indices = neighbor_indices[0][1:11]
-    recommended_movies = df.iloc[recommended_indices]['title'].tolist()
+    
+    # CHANGE: Return full movie objects instead of just titles
+    recommended_movies_data = df.iloc[recommended_indices]
+    recommended_movies = []
+    
+    for _, movie in recommended_movies_data.iterrows():
+        movie_obj = {
+            "title": movie['title'],
+            "overview": movie.get('overview', 'No description available'),
+            "poster_path": movie.get('poster_path', ''),
+            "genres": movie.get('genres', ''),
+            "release_year": movie.get('release_year', None)
+        }
+        recommended_movies.append(movie_obj)
 
     return recommended_movies, corrected_title

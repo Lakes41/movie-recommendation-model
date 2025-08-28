@@ -14,10 +14,19 @@
     "@mantine/core": "^8.2.2",
     "@mantine/hooks": "^8.2.2",
     "amqplib": "^0.10.8",
-    "axios": "^1.11.0",
-    "framer-motion": "^12.23.12",
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-toast": "^1.1.5",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.294.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "framer-motion": "^12.23.12",
+    "axios": "^1.11.0",
+    "tailwind-merge": "^2.0.0",
+    "class-variance-authority": "^0.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
