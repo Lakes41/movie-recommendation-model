@@ -9,15 +9,15 @@ app = FastAPI()
 
 # CORS configuration for production
 origins = [
-    "http://localhost:5173",  # Local development
-    "https://1cinematch.vercel.app/",  # Replace with your Vercel URL
-    "https://*.vercel.app",  # Allow all Vercel subdomains
+    "http://localhost:5173",         # Local dev
+    "https://1cinematch.vercel.app"  # Allow all Vercel subdomains
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
+      allow_origin_regex="https://.*\.vercel\.app",  # Allow all vercel subdomains
     allow_methods=["*"],
     allow_headers=["*"],
 )
