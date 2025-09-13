@@ -1,6 +1,6 @@
 # 🎬 CineMatch - AI-Powered Movie Recommendation System
 
-A sophisticated content-based movie recommendation platform built with **FastAPI** and **Vite + React + TypeScript**, featuring advanced AI algorithms, modern UI design, and comprehensive movie data to deliver personalized film suggestions.
+A sophisticated content-based movie recommendation platform built with **FastAPI** and **Vite + React + TypeScript**, featuring advanced AI algorithms, modern UI design, and comprehensive movie data to deliver personalized film suggestions. 🌐 **Try it out here**: [Live Website]([https://your-website-link.com](https://1cinematch.vercel.app)
 
 ## ✨ Features
 
